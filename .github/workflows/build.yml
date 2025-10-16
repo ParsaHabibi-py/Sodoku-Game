@@ -39,7 +39,6 @@ jobs:
             libfreetype6-dev \
             libsqlite3-dev \
             libpng-dev \
-            libffi-dev \
             libblas-dev \
             liblapack-dev \
             gfortran
@@ -52,7 +51,7 @@ jobs:
         with:
           workdir: .
           buildozer_version: stable
-          buildozer_cmd: android debug
+          command: android debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
