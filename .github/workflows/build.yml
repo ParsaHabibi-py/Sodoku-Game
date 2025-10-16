@@ -10,6 +10,12 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/android
+      ANDROID_SDK_ROOT: /usr/local/android
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      PATH: /usr/local/android/cmdline-tools/latest/bin:/usr/local/android/platform-tools:/usr/local/android/build-tools/34.0.0:${{ env.JAVA_HOME }}/bin:${{ env.PATH }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,6 +33,7 @@ jobs:
             git \
             zip \
             unzip \
+            curl \
             openjdk-17-jdk \
             python3-pip \
             python3-setuptools \
@@ -43,13 +50,43 @@ jobs:
             liblapack-dev \
             gfortran
 
+      - name: Install Android SDK commandline tools
+        run: |
+          sudo mkdir -p /usr/local/android/cmdline-tools
+          curl -L -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          sudo unzip -q cmdline-tools.zip -d /usr/local/android/cmdline-tools
+          sudo mv /usr/local/android/cmdline-tools/cmdline-tools /usr/local/android/cmdline-tools/latest
+          rm cmdline-tools.zip
+          yes | /usr/local/android/cmdline-tools/latest/bin/sdkmanager --licenses
+
+      - name: Install Android packages (build-tools, platform-tools, platforms)
+        run: |
+          /usr/local/android/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "build-tools;34.0.0" \
+            "platforms;android-34"
+          # تأیید نصب لایسنس‌ها
+          yes | /usr/local/android/cmdline-tools/latest/bin/sdkmanager --licenses
+
+      - name: Verify AIDL availability
+        run: |
+          if [ ! -x "/usr/local/android/build-tools/34.0.0/aidl" ]; then
+            echo "AIDL not found after SDK install" && exit 1
+          fi
+          /usr/local/android/build-tools/34.0.0/aidl --version || true
+
       - name: Install Buildozer
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install cython virtualenv buildozer
 
-      - name: Build APK
-        run: buildozer android debug
+      - name: Build APK (debug)
+        run: |
+          # اطمینان از وجود فایل spec در ریشه
+          ls -la
+          test -f buildozer.spec || (echo "buildozer.spec not found in repo root" && exit 1)
+          # Buildozer به طور خودکار SDK/NDK را تشخیص می‌دهد؛ با SDK نصب‌شده سریع‌تر پیش می‌رود
+          buildozer android debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
